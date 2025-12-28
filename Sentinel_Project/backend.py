@@ -1,77 +1,90 @@
 import pathway as pw
-import google.generativeai as genai
 import os
-import time
+from typing import TypedDict, Literal
+from langgraph.graph import StateGraph, END
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
 
-# --- CONFIGURATION ---
-# ⚠️ IMPORTANT: Paste your NEW Google API Key here below
-os.environ["GOOGLE_API_KEY"] = "AIzaSyAUUmulf2IJZw0LlopI5XoedpBh-F0PTw0"
+load_dotenv()
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY")) # Load API key from .env
 
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+class AgentState(TypedDict):
+    report_text: str
+    location: str
+    severity: str
+    unit: str
+    plan: str
 
-# Use Gemini 2.5 Flash (or 1.5 Flash if 2.5 is unavailable in your region)
-MODEL_NAME = 'gemini-2.5-flash' 
-model = genai.GenerativeModel(MODEL_NAME)
+# Initialize Gemini
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    google_api_key=os.environ["GOOGLE_API_KEY"],
+    temperature=0
+)
 
-# --- 1. DEFINE INPUT FORMAT (UPDATED FOR MAP) ---
-# We added latitude and longitude so the Dashboard can plot them
+def classify_node(state: AgentState):
+    msg = f"Report: '{state['report_text']}' at '{state['location']}'. Classify SEVERITY as 'Low', 'Medium', or 'Critical'. Return ONLY the word."
+    response = llm.invoke([HumanMessage(content=msg)])
+    return {"severity": response.content.strip()}
+
+def dispatch_node(state: AgentState):
+    msg = f"Event Severity is {state['severity']}. Report: {state['report_text']}. Assign BEST UNIT (Police, Fire, SWAT, Ambulance) and a 5-word Action Plan."
+    response = llm.invoke([HumanMessage(content=f"{msg}. Format: UNIT | PLAN")])
+
+    try:
+        parts = response.content.split("|")
+        return {"unit": parts[0].strip(), "plan": parts[1].strip()}
+    except:
+        return {"unit": "General Patrol", "plan": "Investigate scene"}
+
+def validate_node(state: AgentState):
+    if "Critical" in state['severity'] and "None" in state['unit']:
+        return {"unit": "SWAT + HAZMAT (Forced Override)", "plan": "Immediate deployment required"}
+    return {} 
+
+workflow = StateGraph(AgentState)
+workflow.add_node("classify", classify_node)
+workflow.add_node("dispatch", dispatch_node)
+workflow.add_node("validate", validate_node)
+
+
+workflow.set_entry_point("classify")
+workflow.add_edge("classify", "dispatch")
+workflow.add_edge("dispatch", "validate")
+workflow.add_edge("validate", END)
+
+
+app = workflow.compile()
+
 class InputSchema(pw.Schema):
     report_text: str
     location: str
     timestamp: str
-    latitude: float   # <--- NEW FIELD
-    longitude: float  # <--- NEW FIELD
+    latitude: float
+    longitude: float
 
-# --- 2. THE BRAIN (Gemini 2.5 Flash) ---
-def agent_decision(report_text, location):
+def agent_pipeline(report_text, location):
     try:
-        # Prompt Engineering for the Agent
-        prompt = f"""
-        Act as an Emergency Dispatch Agent.
-        Event: "{report_text}" at "{location}".
-        
-        Task:
-        1. Classify SEVERITY (Low, Medium, Critical).
-        2. Assign UNIT (Police, Fire, Ambulance, SWAT, None).
-        3. Write a short Action Plan (max 10 words).
-        
-        Output format: SEVERITY | UNIT | PLAN
-        (Example: Critical | Fire | Dispatch engine and evacuate area)
-        """
-        
-        # Call Gemini
-        response = model.generate_content(prompt)
-        return response.text.strip()
+        inputs = {"report_text": report_text, "location": location}
+        result = app.invoke(inputs)
+        return f"{result['severity']} | {result['unit']} | {result['plan']}"
     except Exception as e:
-        return f"ERROR | NONE | System Fault: {str(e)}"
-
-# --- 3. THE REAL-TIME PIPELINE ---
-# Watch the folder for new files
+        return f"ERROR | FAIL | {str(e)}"
 input_stream = pw.io.fs.read(
     "./stream_data",
     format="json",
     schema=InputSchema,
-    mode="streaming" 
+    mode="streaming"
 )
 
-# Apply the Agent decision AND pass through coordinates
 processed_data = input_stream.select(
     timestamp=input_stream.timestamp,
     location=input_stream.location,
     report=input_stream.report_text,
-    latitude=input_stream.latitude,   # <--- PASS TO OUTPUT
-    longitude=input_stream.longitude, # <--- PASS TO OUTPUT
-    # This 'apply' line sends data to Gemini
-    ai_decision=pw.apply(agent_decision, input_stream.report_text, input_stream.location)
+    latitude=input_stream.latitude,
+    longitude=input_stream.longitude,
+    ai_decision=pw.apply(agent_pipeline, input_stream.report_text, input_stream.location)
 )
-
-# --- 4. OUTPUT ---
-# Write results to CSV for the dashboard to read
 pw.io.csv.write(processed_data, "output.csv")
-
-if __name__ == "__main__":
-    print(f"✅ Sentinel Backend Active.")
-    print(f"🧠 Model: {MODEL_NAME}")
-    print("📍 Map Data: Enabled")
-    print("👀 Watching ./stream_data/ for new reports...")
-    pw.run()
+print("✅ Sentinel LangGraph Agent Running...")
+pw.run()
