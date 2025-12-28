@@ -89,7 +89,7 @@ python backend.py
 **🔹 Step B: Start the Simulator**
 Open a new terminal and run the simulator to start streaming data to the backend.
 ```bash
-python backend.py
+python simulator.py
 ```
 
 **🔹 Step C: Launch the Frontend**
