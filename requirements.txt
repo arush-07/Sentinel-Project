@@ -1,0 +1,7 @@
+streamlit
+pandas
+pathway
+langgraph
+langchain-google-genai
+python-dotenv
+google-generativeai
