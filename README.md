@@ -62,8 +62,8 @@ Follow these steps to get the project up and running on your local machine.
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/arush-07/IIT-MADRAS.git
-cd IIT-MADRAS
+git clone [https://github.com/arush-07/IIT-MADRAS.git](https://github.com/arush-07/Sentinel-Project/
+cd Sentinel-Project
 ```
 
 ### 2. Install Dependancies
