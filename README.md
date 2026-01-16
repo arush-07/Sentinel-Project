@@ -1,5 +1,5 @@
 Markdown
-# 🚀 IIT Madras Pathway GenAI Hackathon - Project Bitwise
+# 🚀 Team CS on Top - TechSprint GDG MUJ
 
 <div align="center">
   <img src="https://img.shields.io/badge/Made%20with-Pathway-blue?style=for-the-badge&logo=python" alt="Pathway">
@@ -9,7 +9,7 @@ Markdown
 
 <br />
 
-> **A Next-Gen GenAI solution built for the [Pathway GenAI Hackathon](https://unstop.com/hackathons/pathway-genai-hackathon-iit-madras-1602443) at IIT Madras.**
+> **A Next-Gen GenAI solution built for the TechSprint GDG MUJ hackathon.**
 
 ---
 
@@ -108,5 +108,5 @@ Made with ❤️ by:
 - **Bhavya Jaggi**
 
 <div align="center">
-  <i>Built for the Pathway GenAI Hackathon 2025 @ IIT Madras</i>
+  <i>Built for the TechSprint GDG MUJ hackathon.</i>
 </div>
